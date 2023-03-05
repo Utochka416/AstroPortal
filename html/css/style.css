@@ -1,0 +1,25 @@
+
+body{
+	color: #dcdcdc;
+	font-family: 'Audiowide', cursive;
+	font-family: 'Play', sans-serif;ЮЮ
+}
+.wrap{
+	width: 1200px;
+	margin:0 auto;
+}
+.content{
+	float:right;
+	width:80%;
+}
+aside{
+	float:right;
+	background:whitesmoke;
+	width:20%;
+}
+footer{
+	clear: both;
+}
+.content, aside{
+	height:500px;
+}
