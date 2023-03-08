@@ -1,0 +1,47 @@
+﻿<!DOCTYPE html>
+
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport"
+          content="initial-scale=1,maximum-scale=1,user-scalable=no" />
+    <title>
+        Astroportal
+    </title>
+    <style>
+        html,
+        body,
+        #viewDiv {
+            padding: 0;
+            margin: 0;
+            height: 100%;
+            width: 100%;
+        }
+    </style>
+
+    <link rel="stylesheet"
+          href="https://js.arcgis.com/4.26/esri/themes/light/main.css" />
+    <script src="https://js.arcgis.com/4.26/"></script>
+
+    <script>
+        require(["esri/config", "esri/Map", "esri/views/SceneView"], (esriConfig, Map, SceneView) => {
+            esriConfig.apiKey = "AAPK336fb17b604a45a4b807d33c311e188bjAAZv6YFXyiRet2DAuEqw50dArOzUdOqwzsotKpxi8vTEDAhK3HAZO9x4d9B1Pir";
+            const map = new Map({
+                basemap: "arcgis-imagery-standard",
+                ground: "world-elevation"
+            });
+
+            const view = new SceneView({
+                container: "viewDiv",
+                map: map,
+                scale: 50000000,
+                center: [-101.17, 21.78]
+            });
+        });
+    </script>
+</head>
+
+<body>
+    <div id="viewDiv"></div>
+</body>
+</html>
