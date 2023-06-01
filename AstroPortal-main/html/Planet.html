@@ -1,0 +1,255 @@
+<html lang="en">
+	<head>
+	    <meta charset="utf-8" />
+	    <meta name="viewport"
+	          content="initial-scale=1,maximum-scale=1,user-scalable=no" />
+	    <title>
+	        Satellites in 3D view
+	    </title>
+
+	    <style>
+	        html,
+	        body,
+	        #viewDiv {
+	            padding: 0;
+	            margin: 0;
+	            height: 100%;
+	            width: 100%;
+	        }
+	    </style>
+
+	    <link rel="stylesheet"
+	          href="https://js.arcgis.com/4.26/esri/themes/light/main.css" />
+	    <script src="https://js.arcgis.com/4.26/"></script>
+	    <script src="https://developers.arcgis.com/javascript/latest/sample-code/satellites-3d/live/satellite.js"></script>
+
+	    <script>require([
+	        "esri/Map",
+	        "esri/views/SceneView",
+	        "esri/layers/GraphicsLayer",
+	        "esri/Graphic",
+	        "esri/request"
+	      ], (Map, SceneView, GraphicsLayer, Graphic, esriRequest) => {
+	        const map = new Map({
+	          basemap: "satellite"
+	        });
+
+	        const view = new SceneView({
+	          container: "viewDiv",
+	          map: map,
+	          constraints: {
+	            altitude: {
+	              max: 12000000000 // meters
+	            }
+	          },
+	          // force the popup to the docked position
+	          // for each selected feature
+	          popup: {
+	            dockEnabled: true,
+	            dockOptions: {
+	              breakpoint: false
+	            }
+	          },
+	          environment: {
+	            lighting: {
+	              type: "virtual"
+	            }
+	          }
+	        });
+
+	        view.popup.watch("selectedFeature", () => {
+	          satelliteTracks.removeAll();
+	        });
+
+	        view.popup.on("trigger-action", (event) => {
+	          if (event.action.id === "track") {
+	            satelliteTracks.removeAll();
+
+	            let graphic = view.popup.selectedFeature;
+	            let trackFeatures = [];
+
+	            for (let i = 0; i < 60 * 24; i++) {
+	              let loc = null;
+	              try {
+	                loc = getSatelliteLocation(
+	                  new Date(graphic.attributes.time + i * 1000 * 60),
+	                  graphic.attributes.line1,
+	                  graphic.attributes.line2
+	                );
+	              } catch (error) {}
+
+	              if (loc !== null) {
+	                trackFeatures.push([loc.x, loc.y, loc.z]);
+	              }
+	            }
+
+	            let track = new Graphic({
+	              geometry: {
+	                type: "polyline", // autocasts as new Polyline()
+	                paths: [trackFeatures]
+	              },
+	              symbol: {
+	                type: "line-3d", // autocasts as new LineSymbol3D()
+	                symbolLayers: [
+	                  {
+	                    type: "line", // autocasts as new LineSymbol3DLayer()
+	                    material: {
+	                      color: [192, 192, 192, 0.5]
+	                    },
+	                    size: 3
+	                  }
+	                ]
+	              }
+	            });
+
+	            satelliteTracks.add(track);
+	          }
+	        });
+
+	        const satelliteLayer = new GraphicsLayer();
+	        const satelliteTracks = new GraphicsLayer();
+
+	        map.addMany([satelliteLayer, satelliteTracks]);
+
+	        // request the satallite data from hosted site
+	        let url =
+	          "https://celestrak.org/NORAD/elements/gp.php?GROUP=last-30-days&FORMAT=tle";
+
+	        esriRequest(url, {
+	          responseType: "text"
+	        }).then(function (response) {
+	          // The requested data
+	          const txt = response.data;
+
+	          // Parse the satellite TLE data
+	          const lines = txt.split("\n");
+	          const count = (lines.length / 3).toFixed(0);
+
+	          for (let i = 0; i < count; i++) {
+	            let commonName = lines[i * 3 + 0];
+	            let line1 = lines[i * 3 + 1];
+	            let line2 = lines[i * 3 + 2];
+	            let time = Date.now();
+
+	            /*************************************************
+	             * Create attributes for the International
+	             * designator and Norad identifier. See the
+	             * doc for details.
+	             * https://www.space-track.org/documentation#/tle
+	             *************************************************/
+
+	            const designator = line1.substring(9, 16);
+	            const launchYear = designator.substring(0, 2);
+	            const fullLaunchYear =
+	              Number(launchYear) >= 57 ? `19${launchYear}` : `20${launchYear}`;
+	            const launchNum = Number(designator.substring(2, 5)).toString();
+	            const noradId = Number(line1.substring(3, 7));
+	            let satelliteLoc = null;
+
+	            try {
+	              satelliteLoc = getSatelliteLocation(new Date(time), line1, line2);
+	            } catch (error) {}
+
+	            if (satelliteLoc !== null) {
+	              let template = {
+	                // autocasts as new PopupTemplate()
+	                title: "{name}",
+	                content: "Launch number {number} of {year}",
+	                actions: [
+	                  {
+	                    // Create a popup action to display the satellite track.
+	                    title: "Show Satellite Track",
+	                    id: "track",
+	                    className: "esri-icon-globe"
+	                  }
+	                ]
+	              };
+
+	              let graphic = new Graphic({
+	                geometry: satelliteLoc,
+	                symbol: {
+	                  type: "picture-marker", // autocasts as new PictureMarkerSymbol()
+	                  url: "https://developers.arcgis.com/javascript/latest/sample-code/satellites-3d/live/satellite.png",
+	                  width: 48,
+	                  height: 48
+	                },
+	                attributes: {
+	                  name: commonName,
+	                  year: fullLaunchYear,
+	                  id: noradId,
+	                  number: launchNum,
+	                  time: time,
+	                  line1: line1,
+	                  line2: line2
+	                },
+	                popupTemplate: template
+	              });
+
+	              satelliteLayer.add(graphic);
+	            }
+	          }
+	        });
+
+	        function getSatelliteLocation(date, line1, line2) {
+	          /****************************************************
+	           * satellite-js is a library that includes a set of
+	           * functions to convert TLE to geographic locations
+	           * We use this to get the geographic location of the
+	           * satellites for the current date. For more details
+	           * on satellite-js visib the github repo
+	           * https://github.com/shashwatak/satellite-js
+	           ****************************************************/
+	          const satrec = satellite.twoline2satrec(line1, line2);
+	          const position_and_velocity = satellite.propagate(
+	            satrec,
+	            date.getUTCFullYear(),
+	            date.getUTCMonth() + 1,
+	            date.getUTCDate(),
+	            date.getUTCHours(),
+	            date.getUTCMinutes(),
+	            date.getUTCSeconds()
+	          );
+	          const position_eci = position_and_velocity.position;
+
+	          const gmst = satellite.gstime_from_date(
+	            date.getUTCFullYear(),
+	            date.getUTCMonth() + 1,
+	            date.getUTCDate(),
+	            date.getUTCHours(),
+	            date.getUTCMinutes(),
+	            date.getUTCSeconds()
+	          );
+
+	          const position_gd = satellite.eci_to_geodetic(position_eci, gmst);
+
+	          let longitude = position_gd.longitude;
+	          let latitude = position_gd.latitude;
+	          let height = position_gd.height;
+	          if (isNaN(longitude) || isNaN(latitude) || isNaN(height)) {
+	            return null;
+	          }
+	          const rad2deg = 180 / Math.PI;
+	          while (longitude < -Math.PI) {
+	            longitude += 2 * Math.PI;
+	          }
+	          while (longitude > Math.PI) {
+	            longitude -= 2 * Math.PI;
+	          }
+	          return {
+	            type: "point", // Autocasts as new Point()
+	            x: rad2deg * longitude,
+	            y: rad2deg * latitude,
+	            z: height * 1000
+	          };
+	        }
+	      });</script>
+	</head>
+
+	<body>
+		<form action="" method="get">
+		  <input name="s" placeholder="Искать здесь..." type="search">
+		  <button type="submit">Поиск</button>
+		</form>
+	  	<div id="viewDiv"></div>
+	</body>
+</html>
