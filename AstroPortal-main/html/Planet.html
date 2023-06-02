@@ -28,7 +28,8 @@
 	        "esri/views/SceneView",
 	        "esri/layers/GraphicsLayer",
 	        "esri/Graphic",
-	        "esri/request"
+			"esri/request",
+			"esri/geometry/SpatialReference"
 	      ], (Map, SceneView, GraphicsLayer, Graphic, esriRequest) => {
 	        const map = new Map({
 	          basemap: "satellite"
@@ -36,7 +37,10 @@
 
 	        const view = new SceneView({
 	          container: "viewDiv",
-	          map: map,
+				map: map,
+                spatialReference: {
+                    wkid: 3857
+                },
 	          constraints: {
 	            altitude: {
 	              max: 590000000 // meters
@@ -113,7 +117,7 @@
 
 	        // request the satallite data from hosted site
 	        let url =
-	          "https://celestrak.org/NORAD/elements/gp.php?GROUP=active&FORMAT=tle";
+	          "https://celestrak.org/NORAD/elements/gp.php?GROUP=analyst&FORMAT=tle";
 
 	        esriRequest(url, {
 	          responseType: "text"
@@ -170,7 +174,7 @@
 	                symbol: {
                         type: "simple-marker", // autocasts as new PictureMarkerSymbol()
 						color: [0, 255, 0],
-						size: 5
+						size: 4
 	                },
 	                attributes: {
 	                  name: commonName,
@@ -221,7 +225,7 @@
 	            date.getUTCSeconds()
 				);
                 var observerGd = {
-                    longitude: satellite.degrees_lat(-122.0308),
+                    longitude: satellite.degrees_long(-122.0308),
                     latitude: satellite.degrees_lat(36.9613422),
                     height: 0.370
 				};
@@ -230,24 +234,18 @@
                 const positionEcf = satellite.eci_to_ecf(positionEci, gmst);
 				const lookAngles = satellite.ecf_to_look_angles(observerGd, positionEcf);
 
-	          let longitude = positionGd.longitude;
-	          let latitude = positionGd.latitude;
-				let height = positionGd.height;
-                let azimuth = lookAngles.azimuth
-	          if (isNaN(longitude) || isNaN(latitude) || isNaN(height)) {
+				let satelliteX = positionEcf.x;
+				let satelliteY = positionEcf.y;
+                let satelliteZ = positionEcf.z;
+				let azimuth = lookAngles.azimuth;
+                if (isNaN(satelliteX) || isNaN(satelliteY) || isNaN(satelliteZ)) {
 	            return null;
-	          }
-	          while (longitude < -Math.PI) {
-	            longitude += 2 * Math.PI;
-	          }
-	          while (longitude > Math.PI) {
-	            longitude -= 2 * Math.PI;
 	          }
 	          return {
 	            type: "point", // Autocasts as new Point()
-	            x: rad2deg * longitude,
-	            y: rad2deg * latitude,
-	            z: height * 1000
+                  x: satelliteX,	
+                  y: satelliteY,
+                  z: satelliteZ * 1000
 	          };
 	        }
 	      });</script>
