@@ -4,7 +4,7 @@
 	    <meta name="viewport"
 	          content="initial-scale=1,maximum-scale=1,user-scalable=no" />
 	    <title>
-	        Satellites in 3D view
+	        Astroportal
 	    </title>
 
 	    <style>
@@ -39,7 +39,7 @@
 	          map: map,
 	          constraints: {
 	            altitude: {
-	              max: 12000000000 // meters
+	              max: 590000000 // meters
 	            }
 	          },
 	          // force the popup to the docked position
@@ -68,7 +68,7 @@
 	            let graphic = view.popup.selectedFeature;
 	            let trackFeatures = [];
 
-	            for (let i = 0; i < 60 * 24; i++) {
+	            for (let i = 0; i < 60 * 40; i++) {
 	              let loc = null;
 	              try {
 	                loc = getSatelliteLocation(
@@ -113,7 +113,7 @@
 
 	        // request the satallite data from hosted site
 	        let url =
-	          "https://celestrak.org/NORAD/elements/gp.php?GROUP=last-30-days&FORMAT=tle";
+	          "https://celestrak.org/NORAD/elements/gp.php?GROUP=active&FORMAT=tle";
 
 	        esriRequest(url, {
 	          responseType: "text"
@@ -168,10 +168,9 @@
 	              let graphic = new Graphic({
 	                geometry: satelliteLoc,
 	                symbol: {
-	                  type: "picture-marker", // autocasts as new PictureMarkerSymbol()
-	                  url: "https://developers.arcgis.com/javascript/latest/sample-code/satellites-3d/live/satellite.png",
-	                  width: 48,
-	                  height: 48
+                        type: "simple-marker", // autocasts as new PictureMarkerSymbol()
+						color: [0, 255, 0],
+						size: 5
 	                },
 	                attributes: {
 	                  name: commonName,
@@ -199,8 +198,9 @@
 	           * on satellite-js visib the github repo
 	           * https://github.com/shashwatak/satellite-js
 	           ****************************************************/
+				const rad2deg = 180 / Math.PI;
 	          const satrec = satellite.twoline2satrec(line1, line2);
-	          const position_and_velocity = satellite.propagate(
+              const positionAndVelocity = satellite.propagate(
 	            satrec,
 	            date.getUTCFullYear(),
 	            date.getUTCMonth() + 1,
@@ -209,7 +209,8 @@
 	            date.getUTCMinutes(),
 	            date.getUTCSeconds()
 	          );
-	          const position_eci = position_and_velocity.position;
+				const positionEci = positionAndVelocity.position;
+                const velocityEci = positionAndVelocity.velocity;
 
 	          const gmst = satellite.gstime_from_date(
 	            date.getUTCFullYear(),
@@ -218,17 +219,24 @@
 	            date.getUTCHours(),
 	            date.getUTCMinutes(),
 	            date.getUTCSeconds()
-	          );
+				);
+                var observerGd = {
+                    longitude: satellite.degrees_lat(-122.0308),
+                    latitude: satellite.degrees_lat(36.9613422),
+                    height: 0.370
+				};
 
-	          const position_gd = satellite.eci_to_geodetic(position_eci, gmst);
+				const positionGd = satellite.eci_to_geodetic(positionEci, gmst);
+                const positionEcf = satellite.eci_to_ecf(positionEci, gmst);
+				const lookAngles = satellite.ecf_to_look_angles(observerGd, positionEcf);
 
-	          let longitude = position_gd.longitude;
-	          let latitude = position_gd.latitude;
-	          let height = position_gd.height;
+	          let longitude = positionGd.longitude;
+	          let latitude = positionGd.latitude;
+				let height = positionGd.height;
+                let azimuth = lookAngles.azimuth
 	          if (isNaN(longitude) || isNaN(latitude) || isNaN(height)) {
 	            return null;
 	          }
-	          const rad2deg = 180 / Math.PI;
 	          while (longitude < -Math.PI) {
 	            longitude += 2 * Math.PI;
 	          }
