@@ -121,7 +121,7 @@
 
 			// request the satallite data from hosted site
 			let url =
-				"https://developers.arcgis.com/javascript/latest/sample-code/satellites-3d/live/brightest.txt";
+				"https://celestrak.org/NORAD/elements/gp.php?GROUP=analyst&FORMAT=tle";
 
 			esriRequest(url, {
 				responseType: "text"
@@ -197,59 +197,6 @@
 				}
 			});
 
-            const TWOPI = 2.0 * Math.PI;
-            const XKMPER_WGS72 = 6378.135; // Semi-major axis of the Earth for WGS72 in kilometers
-			const F = 1 / 298.26; // Flattening factor for WGS72
-            function AcTan(y, x) {
-                if (x > 0) {
-                    return Math.atan2(y, x);
-                } else if (x < 0) {
-                    if (y >= 0) {
-                        return Math.atan2(y, x) + Math.PI;
-                    } else {
-                        return Math.atan2(y, x) - Math.PI;
-                    }
-                } else {
-                    if (y > 0) {
-                        return Math.PI / 2;
-                    } else if (y < 0) {
-                        return -Math.PI / 2;
-                    } else {
-                        return 0.0; // undefined
-                    }
-                }
-			};
-
-            function Construct(posEcf, theta) {
-                theta = theta % TWOPI;
-
-                if (theta < 0.0) {
-                    theta += TWOPI; // "wrap" negative modulo
-                }
-
-                const kmSemiMaj = XKMPER_WGS72;
-
-                const r = Math.sqrt(posEcf.m_x * posEcf.m_x + posEcf.m_y * posEcf.m_y);
-                const e2 = F * (2.0 - F);
-                let lat = AcTan(posEcf.m_z, r);
-
-                const delta = 1.0e-07;
-                let phi;
-                let c;
-
-                do {
-                    phi = lat;
-                    c = 1.0 / Math.sqrt(1.0 - e2 * Math.pow(Math.sin(phi), 2));
-                    lat = AcTan(posEcf.m_z + kmSemiMaj * c * e2 * Math.sin(phi), r);
-                } while (Math.abs(lat - phi) > delta);
-
-                const m_Lat = lat;
-                const m_Lon = theta;
-                const m_Alt = r / Math.cos(lat) - kmSemiMaj * c;
-
-                return { latitude: (m_Lat * 180) / Math.PI, longitude: (m_Lon * 180) / Math.PI, altitude: m_Alt };
-			};
-
 			function getSatelliteLocation(date, line1, line2) {
 				/****************************************************
 				 * satellite-js is a library that includes a set of
@@ -270,6 +217,7 @@
 					date.getUTCMinutes(),
 					date.getUTCSeconds()
 				);
+
 				const positionEci = positionAndVelocity.position;
 				const velocityEci = positionAndVelocity.velocity;
 
@@ -283,24 +231,21 @@
 				);
 
 				const positionEcf = satellite.eci_to_ecf(positionEci, gmst);
-				const positionGd = Construct(positionEcf, gmst);
+				const positionGd = satellite.eci_to_geodetic(positionEcf, -gmst);
 
                 let longitude = positionGd.longitude;
                 let latitude = positionGd.latitude;
-				let altitude = positionGd.altitude;
-				console.log(longitude);
-				console.log(latitude);
-                console.log(a);
+                let altitude = positionGd.height;
 
 				//if (isNaN(satelliteX) || isNaN(satelliteY) || isNaN(satelliteZ)) {
                 if (isNaN(longitude) || isNaN(latitude) || isNaN(altitude)) {
 					return null;
 				}
 				return {
-					type: "point", // Autocasts as new Point()
+					type: "point",
                     x: satellite.degrees_long(longitude),
                     y: satellite.degrees_lat(latitude),
-                    z: altitude
+                    z: altitude * 1000
 				};
 			}
 		});
