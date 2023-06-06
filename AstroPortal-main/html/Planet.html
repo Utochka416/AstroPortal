@@ -75,8 +75,13 @@
 
 					let graphic = view.popup.selectedFeature;
 					let trackFeatures = [];
+                    let firstLoc = getSatelliteLocation(
+                        new Date(graphic.attributes.time),
+                        graphic.attributes.line1,
+                        graphic.attributes.line2
+                    );
 
-					for (let i = 0; i < 60 * 24; i++) {
+					for (let i = 0; i < (24 / period) * 60; i++) {
 						let loc = null;
 						try {
 							loc = getSatelliteLocation(
@@ -89,7 +94,9 @@
 						if (loc !== null) {
 							trackFeatures.push([loc.x, loc.y, loc.z]);
 						}
+                        period = Number(graphic.attributes.line2.substring(52, 63));
 					}
+					trackFeatures.push([firstLoc.x, firstLoc.y, firstLoc.z]);
 
 					let track = new Graphic({
 						geometry: {
@@ -122,6 +129,7 @@
 			// request the satallite data from hosted site
 			let url =
 				"https://celestrak.org/NORAD/elements/gp.php?GROUP=analyst&FORMAT=tle";
+            let period;
 
 			esriRequest(url, {
 				responseType: "text"
@@ -152,6 +160,7 @@
 						Number(launchYear) >= 57 ? `19${launchYear}` : `20${launchYear}`;
 					const launchNum = Number(designator.substring(2, 5)).toString();
 					const noradId = Number(line1.substring(3, 7));
+					period = Number(line2.substring(52, 63));
 					let satelliteLoc = null;
 
 					try {
@@ -162,11 +171,11 @@
 						let template = {
 							// autocasts as new PopupTemplate()
 							title: "{name}",
-							content: "Launch number {number} of {year}",
+							content: "Пусковой номер {number} {year} года",
 							actions: [
 								{
 									// Create a popup action to display the satellite track.
-									title: "Show Satellite Track",
+									title: "Показать орбиту спутника",
 									id: "track",
 									className: "esri-icon-globe"
 								}
@@ -206,7 +215,6 @@
 				 * on satellite-js visib the github repo
 				 * https://github.com/shashwatak/satellite-js
 				 ****************************************************/
-				const rad2deg = 180 / Math.PI;
 				const satrec = satellite.twoline2satrec(line1, line2);
 				const positionAndVelocity = satellite.propagate(
 					satrec,
@@ -230,8 +238,8 @@
 					date.getUTCSeconds()
 				);
 
-				const positionEcf = satellite.eci_to_ecf(positionEci, gmst);
-				const positionGd = satellite.eci_to_geodetic(positionEcf, -gmst);
+				const positionEcf = satellite.eci_to_ecf(positionEci, -gmst);
+				const positionGd = satellite.eci_to_geodetic(positionEcf, gmst);
 
                 let longitude = positionGd.longitude;
                 let latitude = positionGd.latitude;
