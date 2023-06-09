@@ -103,7 +103,7 @@
 								graphic.attributes.line1,
 								graphic.attributes.line2
 							);
-						} catch (error) { }
+						} catch (error) { }	
 
 						if (loc !== null) {
 							trackFeatures.push([loc.x, loc.y, loc.z]);
@@ -145,7 +145,7 @@
 			map.addMany([satelliteLayer, satelliteTracks]);
 
 			let url =
-				"https://developers.arcgis.com/javascript/latest/sample-code/satellites-3d/live/brightest.txt";
+				"https://celestrak.org/NORAD/elements/gp.php?GROUP=analyst&FORMAT=tle";
             let period;
 
 			esriRequest(url, {
@@ -178,6 +178,8 @@
 					const launchNum = Number(designator.substring(2, 5)).toString();
 					const noradId = Number(line1.substring(3, 7));
 					period = Number(line2.substring(52, 63));
+					console.log(period);
+					const inclo = Number(line2.substring(8, 16))
 					let satelliteLoc = null;
 
 					try {
@@ -187,7 +189,7 @@
 					if (satelliteLoc !== null) {
 						let template = {
 							title: "{name}",
-							content: "Пусковой номер {number} {year} года",
+                            content: "Пусковой номер {number} {year} года\n Наклон орбиты {inclo}°",
 							actions: [
 								{
 									// Create a popup action to display the satellite track.
@@ -210,6 +212,7 @@
 								year: fullLaunchYear,
 								id: noradId,
 								number: launchNum,
+								inclo: inclo,
 								time: time,
 								line1: line1,
 								line2: line2
@@ -277,11 +280,11 @@
 	</script>
 </head>
 
-	<body>
-		<form action="" method="get">
-		  <input name="s" placeholder="Искать здесь..." type="search">
-		  <button type="submit">Поиск</button>
-		</form>
-	  	<div id="viewDiv"></div>
-	</body>
+<body>
+	<form action="" method="get">
+		<input name="s" placeholder="Искать здесь..." type="search">
+		<button type="submit">Поиск</button>
+	</form>
+	<div id="viewDiv"></div>
+</body>
 </html>
