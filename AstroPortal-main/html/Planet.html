@@ -89,11 +89,6 @@
 
 					let graphic = view.popup.selectedFeature;
 					let trackFeatures = [];
-                    let firstLoc = getSatelliteLocation(
-                        new Date(graphic.attributes.time),
-                        graphic.attributes.line1,
-                        graphic.attributes.line2
-                    );
 
 					for (let i = 0; i < (24 / period) * 60; i++) {
 						let loc = null;
@@ -110,7 +105,6 @@
 						}
                         period = Number(graphic.attributes.line2.substring(52, 63));
 					}
-					trackFeatures.push([firstLoc.x, firstLoc.y, firstLoc.z]);
 
 					let track = new Graphic({
 						geometry: {
@@ -179,7 +173,11 @@
 					const noradId = Number(line1.substring(3, 7));
 					period = Number(line2.substring(52, 63));
 					console.log(period);
-					const inclo = Number(line2.substring(8, 16))
+					const inclo = Number(line2.substring(8, 16));
+					const ecenStr = "0." + line2.substring(26, 33);
+					const eccentricity = Number(ecenStr);
+					const ascendingNode = Number(line2.substring(17, 25));
+					const argumentOfPerigee = Number(line2.substring(34, 42));
 					let satelliteLoc = null;
 
 					try {
@@ -189,7 +187,12 @@
 					if (satelliteLoc !== null) {
 						let template = {
 							title: "{name}",
-                            content: "Пусковой номер {number} {year} года\n Наклон орбиты {inclo}°",
+							content: `<p>Пусковой номер <b>{number}</b></p>
+							<p>Год запуска: <b>{year}</b></p>
+							<p>Наклонение орбиты: <b>{inclo}°</b></p>
+							<p>Эксцентриситет орбиты: <b>{eccentricity}</b></p>
+							<p>Долгота восходящего узла орбиты <b>{ascendingNode}°</b></p>
+							<p>Аргумент перицентра: <b>{argumentOfPerigee}°</b></p>`,
 							actions: [
 								{
 									// Create a popup action to display the satellite track.
@@ -213,6 +216,9 @@
 								id: noradId,
 								number: launchNum,
 								inclo: inclo,
+								eccentricity: eccentricity,
+								ascendingNode: ascendingNode,
+                                argumentOfPerigee: argumentOfPerigee,
 								time: time,
 								line1: line1,
 								line2: line2
