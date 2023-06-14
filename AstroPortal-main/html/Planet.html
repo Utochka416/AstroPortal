@@ -36,7 +36,7 @@
 			const map = new Map({
 				basemap: "satellite"
 			});
-
+			// Настройки сцены
 			const view = new SceneView({
 				container: "viewDiv",
 				map: map,
@@ -45,11 +45,9 @@
 				},
 				constraints: {
 					altitude: {
-						max: 590000000 // meters
+						max: 590000000
 					}
 				},
-				// force the popup to the docked position
-				// for each selected feature
 				popup: {
 					dockEnabled: true,
 					dockOptions: {
@@ -62,27 +60,12 @@
 					}
 				}
 			});
-            layerList = new LayerList({
-                container: document.createElement("div"),
-                view: view
-			});
-            layerListExpand = new Expand({
-                expandIconClass: "esri-icon-layer-list",
-                view: view,
-				content: layerList,
-                listItemCreatedFunction: (event) => {
-                    if (event.item.title === "Спутники") {
-                        event.item.hidden = true;
-                    }
-                }
-            });
-            view.ui.add(layerListExpand, "top-left");
-
 
 			view.popup.watch("selectedFeature", () => {
 				satelliteTracks.removeAll();
 			});
 
+			// Получение координат выбранного спутника в разные периоды времени
 			view.popup.on("trigger-action", (event) => {
 				if (event.action.id === "track") {
 					satelliteTracks.removeAll();
@@ -106,6 +89,7 @@
                         period = Number(graphic.attributes.line2.substring(52, 63));
 					}
 
+					// Отрисовка орбиты выбранного спутника
 					let track = new Graphic({
 						geometry: {
 							type: "polyline",
@@ -139,107 +123,96 @@
 			map.addMany([satelliteLayer, satelliteTracks]);
 
 			let url =
-				"https://celestrak.org/NORAD/elements/gp.php?GROUP=analyst&FORMAT=tle";
+				"https://celestrak.org/NORAD/elements/gp.php?GROUP=stations&FORMAT=tle"; // Ссылка на текстовой файл с данными tle
             let period;
 
 			esriRequest(url, {
 				responseType: "text"
 			}).then(function (response) {
-				// The requested data
 				const txt = response.data;
 
-				// Parse the satellite TLE data
+				// Получение tle данных о спутнике
 				const lines = txt.split("\n");
 				const count = (lines.length / 3).toFixed(0);
+				function getNodes(lines, count) {
+					for (let i = 0; i < count; i++) {
+						let commonName = lines[i * 3 + 0];
+						let line1 = lines[i * 3 + 1];
+						let line2 = lines[i * 3 + 2];
+						let time = Date.now();
 
-				for (let i = 0; i < count; i++) {
-					let commonName = lines[i * 3 + 0];
-					let line1 = lines[i * 3 + 1];
-					let line2 = lines[i * 3 + 2];
-					let time = Date.now();
+						// Информация о спутнике
+						const designator = line1.substring(9, 16);
+						const launchYear = designator.substring(0, 2);
+						const fullLaunchYear =
+							Number(launchYear) >= 57 ? `19${launchYear}` : `20${launchYear}`;
+						const launchNum = Number(designator.substring(2, 5)).toString();
+						const noradId = Number(line1.substring(3, 7));
+						period = Number(line2.substring(52, 63));
+						const inclo = Number(line2.substring(8, 16));
+						const ecenStr = "0." + line2.substring(26, 33);
+						const eccentricity = Number(ecenStr);
+						const ascendingNode = Number(line2.substring(17, 25));
+						const argumentOfPerigee = Number(line2.substring(34, 42));
+						let satelliteLoc = null;
 
-					/*************************************************
-					 * Create attributes for the International
-					 * designator and Norad identifier. See the
-					 * doc for details.
-					 * https://www.space-track.org/documentation#/tle
-					 *************************************************/
+						try {
+							satelliteLoc = getSatelliteLocation(new Date(time), line1, line2);
+						} catch (error) { }
 
-					const designator = line1.substring(9, 16);
-					const launchYear = designator.substring(0, 2);
-					const fullLaunchYear =
-						Number(launchYear) >= 57 ? `19${launchYear}` : `20${launchYear}`;
-					const launchNum = Number(designator.substring(2, 5)).toString();
-					const noradId = Number(line1.substring(3, 7));
-					period = Number(line2.substring(52, 63));
-					console.log(period);
-					const inclo = Number(line2.substring(8, 16));
-					const ecenStr = "0." + line2.substring(26, 33);
-					const eccentricity = Number(ecenStr);
-					const ascendingNode = Number(line2.substring(17, 25));
-					const argumentOfPerigee = Number(line2.substring(34, 42));
-					let satelliteLoc = null;
-
-					try {
-						satelliteLoc = getSatelliteLocation(new Date(time), line1, line2);
-					} catch (error) { }
-
-					if (satelliteLoc !== null) {
-						let template = {
-							title: "{name}",
-							content: `<p>Пусковой номер <b>{number}</b></p>
+						if (satelliteLoc !== null) {
+							let template = {
+								title: "{name}",
+								content: `<p>Пусковой номер <b>{number}</b></p>
 							<p>Год запуска: <b>{year}</b></p>
 							<p>Наклонение орбиты: <b>{inclo}°</b></p>
 							<p>Эксцентриситет орбиты: <b>{eccentricity}</b></p>
 							<p>Долгота восходящего узла орбиты <b>{ascendingNode}°</b></p>
 							<p>Аргумент перицентра: <b>{argumentOfPerigee}°</b></p>`,
-							actions: [
-								{
-									// Create a popup action to display the satellite track.
-									title: "Показать орбиту спутника",
-									id: "track",
-									className: "esri-icon-globe"
-								}
-							]
-						};
+								actions: [
+									{
+										title: "Показать орбиту спутника",
+										id: "track",
+										className: "esri-icon-globe"
+									}
+								]
+							};
 
-						let graphic = new Graphic({
-							geometry: satelliteLoc,
-							symbol: {
-								type: "simple-marker",
-								color: [0, 255, 0],
-								size: 4
-							},
-							attributes: {
-								name: commonName,
-								year: fullLaunchYear,
-								id: noradId,
-								number: launchNum,
-								inclo: inclo,
-								eccentricity: eccentricity,
-								ascendingNode: ascendingNode,
-                                argumentOfPerigee: argumentOfPerigee,
-								time: time,
-								line1: line1,
-								line2: line2
-							},
-							popupTemplate: template
-						});
+							// Отрисовка точки, где находится спутник
+							let graphic = new Graphic({
+								geometry: satelliteLoc,
+								symbol: {
+									type: "simple-marker",
+									color: [0, 255, 0],
+									size: 4
+								},
+								attributes: {
+									name: commonName,
+									year: fullLaunchYear,
+									id: noradId,
+									number: launchNum,
+									inclo: inclo,
+									eccentricity: eccentricity,
+									ascendingNode: ascendingNode,
+									argumentOfPerigee: argumentOfPerigee,
+									time: time,
+									line1: line1,
+									line2: line2
+								},
+								popupTemplate: template
+							});
 
-						satelliteLayer.add(graphic);
+							satelliteLayer.add(graphic);
+						}
 					}
+
 				}
+				setInterval(() => satelliteLayer.removeAll(), 1000);
+				setInterval(getNodes, 1000, lines, count);
 			});
 
+			// Функция получения координат спутника в конкретный момент времени
 			function getSatelliteLocation(date, line1, line2) {
-				/****************************************************
-				 * satellite-js is a library that includes a set of
-				 * functions to convert TLE to geographic locations
-				 * We use this to get the geographic location of the
-				 * satellites for the current date. For more details
-				 * on satellite-js visib the github repo
-				 * https://github.com/shashwatak/satellite-js
-				 ****************************************************/
 				const satrec = satellite.twoline2satrec(line1, line2);
 				const positionAndVelocity = satellite.propagate(
 					satrec,
@@ -287,10 +260,6 @@
 </head>
 
 <body>
-	<form action="" method="get">
-		<input name="s" placeholder="Искать здесь..." type="search">
-		<button type="submit">Поиск</button>
-	</form>
 	<div id="viewDiv"></div>
 </body>
 </html>
