@@ -123,7 +123,7 @@
 			map.addMany([satelliteLayer, satelliteTracks]);
 
 			let url =
-				"https://celestrak.org/NORAD/elements/gp.php?GROUP=visual&FORMAT=tle"; // Ссылка на текстовой файл с данными tle
+				"https://celestrak.org/NORAD/elements/gp.php?GROUP=resource&FORMAT=tle"; // Ссылка на текстовой файл с данными tle
             let period;
 
 			esriRequest(url, {
@@ -134,7 +134,7 @@
 				// Получение tle данных о спутнике
 				const lines = txt.split("\n");
 				const count = (lines.length / 3).toFixed(0);
-				function getNodes(lines, count) {
+				
 					for (let i = 0; i < count; i++) {
 						let commonName = lines[i * 3 + 0];
 						let line1 = lines[i * 3 + 1];
@@ -203,12 +203,22 @@
 							});
 
 							satelliteLayer.add(graphic);
-						}
-					}
-
+						}					
 				}
-				setInterval(() => satelliteLayer.removeAll(), 1000);
-				setInterval(getNodes, 1000, lines, count);
+				setInterval(UpdatePos, 500, satelliteLayer.graphics);
+				function UpdatePos(list) {
+					for (let i = 0; i < count; i++) {
+						let commonName = lines[i * 3 + 0];
+						let line1 = lines[i * 3 + 1];
+						let line2 = lines[i * 3 + 2];
+                        let time = Date.now();
+						let item = list.find(function (graphic) { return graphic.attributes.name == commonName });
+                        try {
+                            satelliteLoc = getSatelliteLocation(new Date(time), line1, line2);
+							item.geometry = satelliteLoc;
+                        } catch (error) { }						
+					}
+				}
 			});
 
 			// Функция получения координат спутника в конкретный момент времени
